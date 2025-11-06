@@ -92,39 +92,38 @@ async def post_order(client, first_name, last_name, email, subject, text, html, 
 async def get_mail(username, password, imap_server):
     array = []
     print('connecting to imap server...')
+    
     with MailBox(imap_server).login(username, password, initial_folder='Novers Казань') as mailbox:
-        print('fetching...')
+        print('fetching unread emails...')
+        
         exists = mailbox.folder.exists('Novers Казань/INBOX|Казань')
         if not exists:
             mailbox.folder.create('Novers Казань/INBOX|Казань')
-       
-        # Берём все письма, вне зависимости от прочитанности
-        for msg in mailbox.fetch():
-            mailbox.move(msg.uid, 'Novers Казань/INBOX|Казань') 
+        
+        # Только непрочитанные письма
+        for msg in mailbox.fetch(AND(seen=False)):
+            attachments = [a for a in msg.attachments]
+
+            # создаем заказ и пр.
+            # ...
             
-            attachments = []
-            for a in msg.attachments:
-                print(a.filename)
-                attachments.append(a)
+            # пометить как прочитанное, чтобы не подхватывалось в будущем
+            mailbox.flag(msg.uid, ['\\Seen'], True)
             
-            name = re.search('(.*) <' + msg.from_ + '>', msg.from_values.full).group(1).split(' ')
-            lastName = name[-1]
-            name.pop(-1)
-            firstName = ' '.join(name)
+            # перемещаем в архив
+            mailbox.move(msg.uid, 'Novers Казань/INBOX|Казань')
             
-            data = {
+            array.append({
                 "email": msg.from_,
-                "first_name": firstName,
-                "last_name": lastName,
+                "first_name": "",
+                "last_name": "",
                 "subject": msg.subject,
                 "text": msg.text,
                 "html": msg.html,
                 "attachments": attachments
-            }
-            print(data["email"])
-            print(msg.date, msg.from_, msg.subject, msg.from_values, name, len(msg.text or msg.html))
-            array.append(data)
-        return array
+            })
+    
+    return array
 
 
 async def task():
