@@ -152,7 +152,7 @@ def get_mail_imap():
         })
 
         # перемещение письма
-        imap.copy('INBOX|Казань)
+        imap.copy('INBOX|Казань')
         imap.store(num, '+FLAGS', '\\Deleted')
 
     imap.expunge()
