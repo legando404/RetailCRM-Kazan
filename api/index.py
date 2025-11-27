@@ -14,21 +14,20 @@ import re
 # ЗАГРУЗКА ПЕРЕМЕННЫХ ОДИН РАЗ
 # (уменьшает CPU в 2–3 раза на cold start)
 # -----------------------------
+URL = os.getenv("URL")
+SITE = os.getenv('site')
+APIKEY = os.getenv('key')
+
+PASSWORD = os.getenv('password')
+USERNAME = os.getenv('user')
+IMAP_SERVER = os.getenv('imap')
+
+retail_client = retailcrm.v5(URL, APIKEY)
+
+MOVE_TO = 'INBOX|Казань'
+SOURCE_FOLDER = 'Novers Казань'
+
 app = FastAPI()
-#url = 'https://mdevelopeur.retailcrm.ru/api/v5/'
-url = os.getenv("URL")#'https://laminat77.retailcrm.ru'
-site = os.getenv('site')#= 'kazan-novers-ru'
-apikey = os.getenv('key') #'vikuHSdIKilFPMr0oyj5LpemwHvEPjVw'
-#apikey = 'nHY0H7zd7UWwcEiwN0EbwhXz2eGY9o9G'
-retail_client = retailcrm.v5(url, apikey)
-#headers = {'X-API-KEY' : apikey}
-conn = http.client.HTTPSConnection('laminat77.retailcrm.ru')
-headers = { 'X-API-KEY': apikey, 'Content-Type': 'image/jpeg' }  
-#password = "zrAUqnFWgD14Ygkq13VK"
-#username = "kworktestbox@mail.ru"
-password = os.getenv('password')  #"r4ZuvyWydYMktHuTn3uJ"
-username = os.getenv('user')#"novers495@mail.ru"
-imap_server = os.getenv('imap')#"imap.mail.ru"
 
 # ------------------------------------------------------
 # Помощник: загрузка файла в RetailCRM (асинхронная)
