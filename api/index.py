@@ -1,3 +1,80 @@
+from fastapi import FastAPI
+import asyncio
+import imaplib
+import email
+from email.parser import BytesParser
+from email.policy import default
+import os
+import httpx
+import retailcrm
+import base64
+import re
+
+# -----------------------------
+# ЗАГРУЗКА ПЕРЕМЕННЫХ ОДИН РАЗ
+# (уменьшает CPU в 2–3 раза на cold start)
+# -----------------------------
+URL = os.getenv("URL")
+SITE = os.getenv('site')
+APIKEY = os.getenv('key')
+
+PASSWORD = os.getenv('password')
+USERNAME = os.getenv('user')
+IMAP_SERVER = os.getenv('imap')
+
+retail_client = retailcrm.v5(URL, APIKEY)
+
+MOVE_TO = 'INBOX|Казань'
+SOURCE_FOLDER = 'Novers Казань'
+
+app = FastAPI()
+
+# ------------------------------------------------------
+# Помощник: загрузка файла в RetailCRM (асинхронная)
+# ------------------------------------------------------
+async def upload_attachment(client, payload, filename, order_id):
+    try:
+        headers = {
+            "X-API-KEY": APIKEY,
+            "Content-Type": "image/jpeg"
+        }
+        r = await client.post(f"{URL}/api/v5/files/upload", data=payload, headers=headers)
+        file_id = r.json()["file"]["id"]
+
+        data = {
+            'id': file_id,
+            'filename': filename,
+            'attachment': [{'order': {'id': order_id}}]
+        }
+        retail_client.files_edit(data)
+    except Exception as e:
+        print("Upload error:", e)
+
+# ------------------------------------------------------
+# ПОСТ ЗАКАЗА
+# ------------------------------------------------------
+def post_order(first_name, last_name, email_addr, subject, text, html):
+    try:
+        customers = retail_client.customers({'email': email_addr}).get_response().get("customers", [])
+    except:
+        customers = []
+
+    order = {
+        'customerComment': text,
+        'status': 'novoe-pismo',
+        'orderMethod': 'e-mail',
+        'customFields': {'tema_pisma1': subject, 'tekst_pisma': text},
+        'lastName': last_name,
+        'firstName': first_name,
+        'email': email_addr
+    }
+
+    if customers:
+        order["customer"] = {'id': customers[0]["id"]}
+
+    result = retail_client.order_create(order, SITE)
+    return result.get_response()["id"]
+
 # ------------------------------------------------------
 # IMAP: быстрый и безопасный сбор писем
 # ------------------------------------------------------
@@ -90,3 +167,34 @@ def get_mail_imap():
     imap.logout()
 
     return mails
+
+
+# ------------------------------------------------------
+# ОСНОВНОЙ ТРИГГЕР
+# ------------------------------------------------------
+async def process_all():
+    msgs = get_mail_imap()
+    out = []
+
+    async with httpx.AsyncClient() as client:
+        for msg in msgs:
+            order_id = post_order(
+                msg["first_name"],
+                msg["last_name"],
+                msg["email"],
+                msg["subject"],
+                msg["text"],
+                msg["html"]
+            )
+
+            for filename, payload in msg["attachments"]:
+                await upload_attachment(client, payload, filename, order_id)
+
+            out.append({"order": order_id, "email": msg["email"]})
+
+    return out
+
+
+@app.get("/api")
+async def api():
+    return await process_all()
