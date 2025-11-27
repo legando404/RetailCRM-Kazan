@@ -14,9 +14,6 @@ import re
 # ЗАГРУЗКА ПЕРЕМЕННЫХ ОДИН РАЗ
 # (уменьшает CPU в 2–3 раза на cold start)
 # -----------------------------
-load_dotenv()
-#res = #conn.getresponse() data = res.read() print()
-
 app = FastAPI()
 #url = 'https://mdevelopeur.retailcrm.ru/api/v5/'
 url = os.getenv("URL")#'https://laminat77.retailcrm.ru'
