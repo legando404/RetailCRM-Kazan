@@ -21,62 +21,47 @@ load_dotenv()
 #res = #conn.getresponse() data = res.read() print()
 
 app = FastAPI()
+#url = 'https://mdevelopeur.retailcrm.ru/api/v5/'
 url = os.getenv("URL")#'https://laminat77.retailcrm.ru'
 site = os.getenv('site')#= 'kazan-novers-ru'
 apikey = os.getenv('key') #'vikuHSdIKilFPMr0oyj5LpemwHvEPjVw'
+#apikey = 'nHY0H7zd7UWwcEiwN0EbwhXz2eGY9o9G'
 retail_client = retailcrm.v5(url, apikey)
 #headers = {'X-API-KEY' : apikey}
 conn = http.client.HTTPSConnection('laminat77.retailcrm.ru')
 headers = { 'X-API-KEY': apikey, 'Content-Type': 'image/jpeg' }  
+#password = "zrAUqnFWgD14Ygkq13VK"
+#username = "kworktestbox@mail.ru"
 password = os.getenv('password')  #"r4ZuvyWydYMktHuTn3uJ"
 username = os.getenv('user')#"novers495@mail.ru"
 imap_server = os.getenv('imap')#"imap.mail.ru"
 
-def safe_filename(filename: str) -> str:
-    """
-    Преобразует имя файла в безопасное:
-    - оставляет только буквы, цифры, _, -, .
-    - заменяет пробелы на подчёркивания
-    """
-    filename = re.sub(r'[^a-zA-Z0-9_.- ]', '', filename)  # удаляем опасные символы
-    filename = filename.replace(' ', '_')  # заменяем пробелы на _
-    return filename
-
 async def upload_file(client, file, order):
     print(file.filename, file.content_disposition)
     try:
-        # Отправляем файл на сервер
-        response = await client.post(
-            url + "/api/v5/files/upload",
-            data=file.payload,
-            headers=headers
-        )
-        file_id = response.json()["file"]["id"]
-
-        # Формируем безопасное имя файла
-        filename = safe_filename(file.filename)
-
-        # Данные для редактирования файла
-        data = {
-            'id': file_id,
-            'filename': filename,
-            'attachment': [{'order': {'id': order}}]
-        }
-
-        # Редактируем файл через retail_client
+        response = await client.post(url + "/api/v5/files/upload", data = file.payload, headers = headers)
+        id = response.json()["file"]["id"]
+        filename = ''.join(re.findall(r"\w+| |\.", file.filename))
+        data = { 'id': id, 'filename': file.filename, 'attachment': [{'order':{'id': order}}]}
         response = retail_client.files_edit(data)
         print(response.get_response())
-
     except Exception as e:
-        print('Exception:', e)
-
-# ------------------------------ Остальной код без изменений ------------------------------
+                print('exception: ', e)
 
 async def main(client):
     messages = await get_mail(username, password, imap_server)
     for msg in messages : 
         for a in msg["attachments"]:
             print(a.filename)
+        #for a in msg["attachments"]: 
+            #files = {'file': a.payload}
+            #try:                       
+                #conn.request("POST", "/api/v5/files/upload", a.payload, headers)
+                #file = conn.getresponse().read().decode("utf-8")
+                #file = await client.post(url + '/api/v5/files/upload', payload=a.payload, headers=headers)
+            #except Exception as e:
+                #print('exception: ', e)
+            #print(file.content, file.json()["file"]["id"])
         response = await post_order(retail_client, msg["first_name"], msg["last_name"], msg["email"], msg["subject"], msg["text"], msg["html"], msg["attachments"])
         order = response.get_response()["id"]
         for a in msg["attachments"]: 
@@ -150,5 +135,7 @@ async def task():
 
 @app.get('/api')
 async def api():
+    #start = time()
     output = await task()
+    #print("time: ", time() - start)
     return output
