@@ -14,20 +14,24 @@ import re
 # ЗАГРУЗКА ПЕРЕМЕННЫХ ОДИН РАЗ
 # (уменьшает CPU в 2–3 раза на cold start)
 # -----------------------------
-URL = os.getenv("https://laminat77.retailcrm.ru")
-SITE = os.getenv('kazan-novers-ru')
-APIKEY = os.getenv('vikuHSdIKilFPMr0oyj5LpemwHvEPjVw')
-
-PASSWORD = os.getenv('r4ZuvyWydYMktHuTn3uJ')
-USERNAME = os.getenv('novers495@mail.ru')
-IMAP_SERVER = os.getenv('imap.mail.ru')
-
-retail_client = retailcrm.v5(URL, APIKEY)
-
-MOVE_TO = 'INBOX|Казань'
-SOURCE_FOLDER = 'Novers Казань'
+load_dotenv()
+#res = #conn.getresponse() data = res.read() print()
 
 app = FastAPI()
+#url = 'https://mdevelopeur.retailcrm.ru/api/v5/'
+url = os.getenv("URL")#'https://laminat77.retailcrm.ru'
+site = os.getenv('site')#= 'kazan-novers-ru'
+apikey = os.getenv('key') #'vikuHSdIKilFPMr0oyj5LpemwHvEPjVw'
+#apikey = 'nHY0H7zd7UWwcEiwN0EbwhXz2eGY9o9G'
+retail_client = retailcrm.v5(url, apikey)
+#headers = {'X-API-KEY' : apikey}
+conn = http.client.HTTPSConnection('laminat77.retailcrm.ru')
+headers = { 'X-API-KEY': apikey, 'Content-Type': 'image/jpeg' }  
+#password = "zrAUqnFWgD14Ygkq13VK"
+#username = "kworktestbox@mail.ru"
+password = os.getenv('password')  #"r4ZuvyWydYMktHuTn3uJ"
+username = os.getenv('user')#"novers495@mail.ru"
+imap_server = os.getenv('imap')#"imap.mail.ru"
 
 # ------------------------------------------------------
 # Помощник: загрузка файла в RetailCRM (асинхронная)
@@ -85,7 +89,7 @@ def get_mail_imap():
     imap.login(USERNAME, PASSWORD)
 
     # перейти в исходную папку
-    imap.select(f'"{SOURCE_FOLDER}"')
+    imap.select('Novers Казань')
 
     # забираем ТОЛЬКО новые письма
     status, data = imap.search(None, "ALL")
@@ -148,7 +152,7 @@ def get_mail_imap():
         })
 
         # перемещение письма
-        imap.copy(num, f'"{MOVE_TO}"')
+        imap.copy('INBOX|Казань)
         imap.store(num, '+FLAGS', '\\Deleted')
 
     imap.expunge()
