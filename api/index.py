@@ -1,57 +1,51 @@
 from fastapi import FastAPI
 import asyncio
 import imaplib
-import email
 from email.parser import BytesParser
 from email.policy import default
 import os
 import httpx
 import retailcrm
-import base64
 import re
 
 # -----------------------------
-# ЗАГРУЗКА ПЕРЕМЕННЫХ ОДИН РАЗ
-# (уменьшает CPU в 2–3 раза на cold start)
+# Переменные окружения
 # -----------------------------
 URL = os.getenv("URL")
-SITE = os.getenv('site')
-APIKEY = os.getenv('key')
+APIKEY = os.getenv("APIKEY")
+SITE = os.getenv("SITE")
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+IMAP_SERVER = os.getenv("IMAP_SERVER")
 
-PASSWORD = os.getenv('password')
-USERNAME = os.getenv('user')
-IMAP_SERVER = os.getenv('imap')
-
-retail_client = retailcrm.v5(URL, APIKEY)
-
-MOVE_TO = 'INBOX|Казань'
+MOVE_TO = 'Novers Казань/INBOX|Казань'
 SOURCE_FOLDER = 'Novers Казань'
 
+# Проверка переменных окружения
+if not all([URL, APIKEY, SITE, USERNAME, PASSWORD, IMAP_SERVER]):
+    raise RuntimeError("Не все переменные окружения установлены!")
+
+# Клиент RetailCRM
+retail_client = retailcrm.v5(URL, APIKEY)
+
+# FastAPI для Vercel
 app = FastAPI()
 
 # ------------------------------------------------------
-# Помощник: загрузка файла в RetailCRM (асинхронная)
+# Асинхронная загрузка вложений в RetailCRM
 # ------------------------------------------------------
 async def upload_attachment(client, payload, filename, order_id):
     try:
-        headers = {
-            "X-API-KEY": APIKEY,
-            "Content-Type": "image/jpeg"
-        }
+        headers = {"X-API-KEY": APIKEY, "Content-Type": "image/jpeg"}
         r = await client.post(f"{URL}/api/v5/files/upload", data=payload, headers=headers)
         file_id = r.json()["file"]["id"]
-
-        data = {
-            'id': file_id,
-            'filename': filename,
-            'attachment': [{'order': {'id': order_id}}]
-        }
+        data = {'id': file_id, 'filename': filename, 'attachment':[{'order':{'id': order_id}}]}
         retail_client.files_edit(data)
     except Exception as e:
         print("Upload error:", e)
 
 # ------------------------------------------------------
-# ПОСТ ЗАКАЗА
+# Создание заказа
 # ------------------------------------------------------
 def post_order(first_name, last_name, email_addr, subject, text, html):
     try:
@@ -76,21 +70,18 @@ def post_order(first_name, last_name, email_addr, subject, text, html):
     return result.get_response()["id"]
 
 # ------------------------------------------------------
-# IMAP: быстрый и безопасный сбор писем
+# Получение писем через IMAP
 # ------------------------------------------------------
 def get_mail_imap():
     mails = []
-
     try:
         imap = imaplib.IMAP4_SSL(IMAP_SERVER)
         imap.login(USERNAME, PASSWORD)
-        # Открываем исходную папку
         imap.select(SOURCE_FOLDER)
     except Exception as e:
         print("IMAP connection error:", e)
         return mails
 
-    # Берём все письма
     status, data = imap.search(None, "ALL")
     if status != "OK":
         print("IMAP search failed")
@@ -106,13 +97,13 @@ def get_mail_imap():
 
             msg = BytesParser(policy=default).parsebytes(msg_data[0][1])
 
-            # Парсим имя отправителя
+            # Парсим имя
             first_name, last_name = "", ""
             if msg['from']:
                 try:
-                    name_match = re.match(r'(.*) <', msg['from'])
-                    if name_match:
-                        full_name = name_match.group(1).strip()
+                    match = re.match(r'(.*) <', msg['from'])
+                    if match:
+                        full_name = match.group(1).strip()
                         parts = full_name.split()
                         if parts:
                             last_name = parts[-1]
@@ -120,7 +111,7 @@ def get_mail_imap():
                 except:
                     pass
 
-            # Сбор текста и html
+            # Текст + HTML
             text, html = "", ""
             attachments = []
 
@@ -151,7 +142,7 @@ def get_mail_imap():
                 "attachments": attachments
             })
 
-            # Перемещаем письмо в целевую папку
+            # Перемещение письма
             try:
                 imap.copy(num, MOVE_TO)
                 imap.store(num, '+FLAGS', '\\Deleted')
@@ -168,9 +159,8 @@ def get_mail_imap():
 
     return mails
 
-
 # ------------------------------------------------------
-# ОСНОВНОЙ ТРИГГЕР
+# Основной асинхронный процесс
 # ------------------------------------------------------
 async def process_all():
     msgs = get_mail_imap()
@@ -179,12 +169,8 @@ async def process_all():
     async with httpx.AsyncClient() as client:
         for msg in msgs:
             order_id = post_order(
-                msg["first_name"],
-                msg["last_name"],
-                msg["email"],
-                msg["subject"],
-                msg["text"],
-                msg["html"]
+                msg["first_name"], msg["last_name"], msg["email"],
+                msg["subject"], msg["text"], msg["html"]
             )
 
             for filename, payload in msg["attachments"]:
@@ -194,7 +180,9 @@ async def process_all():
 
     return out
 
-
+# ------------------------------------------------------
+# FastAPI route для Vercel
+# ------------------------------------------------------
 @app.get("/api")
 async def api():
     return await process_all()
