@@ -50,24 +50,38 @@ async def upload_file(client, file, order):
 
 async def main(client):
     messages = await get_mail(username, password, imap_server)
-    for msg in messages : 
+    all_responses = []  # 1. Создаем список для хранения результатов
+    
+    for msg in messages: 
+        # Печатаем для отладки
         for a in msg["attachments"]:
-            print(a.filename)
-        #for a in msg["attachments"]: 
-            #files = {'file': a.payload}
-            #try:                       
-                #conn.request("POST", "/api/v5/files/upload", a.payload, headers)
-                #file = conn.getresponse().read().decode("utf-8")
-                #file = await client.post(url + '/api/v5/files/upload', payload=a.payload, headers=headers)
-            #except Exception as e:
-                #print('exception: ', e)
-            #print(file.content, file.json()["file"]["id"])
-        response = await post_order(retail_client, msg["first_name"], msg["last_name"], msg["email"], msg["subject"], msg["text"], msg["html"], msg["attachments"])
-        order = response.get_response()["id"]
-        for a in msg["attachments"]: 
-            if a.content_disposition == 'attachment':
-                await upload_file(client, a, order)
-        return response    
+            print(f"Обработка вложения: {a.filename}")
+
+        # Создаем заказ
+        response = await post_order(
+            retail_client, 
+            msg["first_name"], 
+            msg["last_name"], 
+            msg["email"], 
+            msg["subject"], 
+            msg["text"], 
+            msg["html"], 
+            msg["attachments"]
+        )
+        
+        # Получаем ID созданного заказа
+        order_res_data = response.get_response()
+        order_id = order_res_data.get("id")
+        
+        # Загружаем файлы к этому заказу
+        if order_id:
+            for a in msg["attachments"]: 
+                if a.content_disposition == 'attachment':
+                    await upload_file(client, a, order_id)
+        
+        # 2. Вместо return добавляем результат в список
+        all_responses.append(order_res_data)
+
 
 async def post_order(client, first_name, last_name, email, subject, text, html, attachments):
     print('posting...')
@@ -98,31 +112,23 @@ async def get_mail(username, password, imap_server):
         if not exists:
             mailbox.folder.create('Novers Казань/INBOX|Казань')
        
-        # Берём все письма, вне зависимости от прочитанности
-        for msg in mailbox.fetch():
-            mailbox.move(msg.uid, 'Novers Казань/INBOX|Казань') 
-            
+        for msg in mailbox.fetch(AND(seen=True)):
+            mailbox.move(msg.uid,'Novers Казань/INBOX|Казань') 
             attachments = []
             for a in msg.attachments:
                 print(a.filename)
+                #print(a.payload)
                 attachments.append(a)
-            
+            print(len(attachments))
             name = re.search('(.*) <' + msg.from_ + '>', msg.from_values.full).group(1).split(' ')
+            print(name)
             lastName = name[-1]
             name.pop(-1)
             firstName = ' '.join(name)
-            
-            data = {
-                "email": msg.from_,
-                "first_name": firstName,
-                "last_name": lastName,
-                "subject": msg.subject,
-                "text": msg.text,
-                "html": msg.html,
-                "attachments": attachments
-            }
+            print(firstName, lastName)
+            data = {"email": msg.from_, "first_name": firstName, "last_name": lastName, "subject": msg.subject, "text": msg.text, "html": msg.html, "attachments": attachments}
             print(data["email"])
-            print(msg.date, msg.from_, msg.subject, msg.from_values, name, len(msg.text or msg.html))
+            print(msg.date, msg.from_, msg.subject, msg.from_values,name, len(msg.text or msg.html))
             array.append(data)
         return array
 
