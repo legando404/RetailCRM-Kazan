@@ -112,24 +112,44 @@ async def get_mail(username, password, imap_server):
         if not exists:
             mailbox.folder.create('Novers Казань/INBOX|Казань')
        
-        for msg in mailbox.fetch(AND(seen=True)):
+        for msg in mailbox.fetch(limit=5):
+            try:
+                attachments = []
+                for a in msg.attachments:
+                    attachments.append(a)
+
+                # 2. Безопасное получение имени (чтобы скрипт не падал на пустых именах)
+                full_name = msg.from_values.name or "No Name"
+                name_parts = full_name.split(' ')
+                
+                if len(name_parts) > 1:
+                    lastName = name_parts[-1]
+                    firstName = ' '.join(name_parts[:-1])
+                else:
+                    firstName = name_parts[0]
+                    lastName = ""
+
+                data = {
+                    "email": msg.from_, 
+                    "first_name": firstName, 
+                    "last_name": lastName, 
+                    "subject": msg.subject, 
+                    "text": msg.text, 
+                    "html": msg.html, 
+                    "attachments": attachments
+                }
+                
+                # Добавляем в массив для CRM
+                array.append(data)
+
+                # 3. Перемещаем уже после того, как данные собраны
             mailbox.move(msg.uid,'Novers Казань/INBOX|Казань') 
-            attachments = []
-            for a in msg.attachments:
-                print(a.filename)
-                #print(a.payload)
-                attachments.append(a)
-            print(len(attachments))
-            name = re.search('(.*) <' + msg.from_ + '>', msg.from_values.full).group(1).split(' ')
-            print(name)
-            lastName = name[-1]
-            name.pop(-1)
-            firstName = ' '.join(name)
-            print(firstName, lastName)
-            data = {"email": msg.from_, "first_name": firstName, "last_name": lastName, "subject": msg.subject, "text": msg.text, "html": msg.html, "attachments": attachments}
-            print(data["email"])
-            print(msg.date, msg.from_, msg.subject, msg.from_values,name, len(msg.text or msg.html))
-            array.append(data)
+             print(f"Письмо {msg.uid} обработано и перемещено в INBOX|CRM")
+
+            except Exception as e:
+                print(f"Ошибка при обработке конкретного письма: {e}")
+                continue
+
         return array
 
 
