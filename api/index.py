@@ -144,7 +144,7 @@ async def get_mail(username, password, imap_server):
 
                 # 3. Перемещаем уже после того, как данные собраны
             mailbox.move(msg.uid,'Novers Казань/INBOX|Казань') 
-             print(f"Письмо {msg.uid} обработано и перемещено в INBOX|CRM")
+             print(f"Письмо {msg.uid} обработано и перемещено в INBOX|Казань")
 
             except Exception as e:
                 print(f"Ошибка при обработке конкретного письма: {e}")
