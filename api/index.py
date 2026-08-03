@@ -143,7 +143,7 @@ async def get_mail(username, password, imap_server):
                 array.append(data)
 
                 # 3. Перемещаем уже после того, как данные собраны
-                mailbox.move(msg.uid,'Novers Казань/INBOX|Казань') 
+                mailbox.move(msg.uid,'6 Другие города/Novers Казань/INBOX|Казань') 
                 print(f"Письмо {msg.uid} обработано и перемещено в INBOX|Казань")
 
             except Exception as e:
