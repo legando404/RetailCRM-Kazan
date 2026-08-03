@@ -106,11 +106,11 @@ async def post_order(client, first_name, last_name, email, subject, text, html, 
 async def get_mail(username, password, imap_server):
     array = []
     print('connecting to imap server...')
-    with MailBox(imap_server).login(username, password, initial_folder='Novers Казань') as mailbox:
+    with MailBox(imap_server).login(username, password, initial_folder='6 Другие города/Novers Казань') as mailbox:
         print('fetching...')
-        exists = mailbox.folder.exists('Novers Казань/INBOX|Казань')
+        exists = mailbox.folder.exists('6 Другие города/Novers Казань/INBOX|Казань')
         if not exists:
-            mailbox.folder.create('Novers Казань/INBOX|Казань')
+            mailbox.folder.create('6 Другие города/Novers Казань/INBOX|Казань')
        
         for msg in mailbox.fetch(limit=5):
             try:
